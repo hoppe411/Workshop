@@ -1,0 +1,45 @@
+* PETase (6EQE) protein-only build
+* reads PDB, keeps protein chain A, adds H, writes clean PSF/PDB
+
+set TOPPAR = ~/petase_charmm/toppar
+
+! ---- I/O ----
+open unit 10 read  form name 6EQE.pdb
+open unit 20 write form name petase_clean.pdb
+open unit 21 write form name petase_clean.psf
+
+! ---- force field ----
+read rtf  card name @TOPPAR/top_all36_prot.rtf
+read para card name @TOPPAR/par_all36m_prot.prm
+stream @TOPPAR/toppar_water_ions.str   ! TIP3P + ions params (for later)
+
+! ---- use helper to read PDB cleanly ----
+stream @TOPPAR/pdbread.str
+
+! Read only the protein (chain A). pdbread.str ignores HETATM by default.
+! If needed, you can explicitly tell it which chain to take (segid/chain A).
+! Most 6EQE files have chain A only; if your file uses chain ID 'A', we mirror it:
+read sequ pdb unit 10
+generate PROA setup first nter last cter
+rewind unit 10
+read coor  pdb unit 10 resid
+
+! Optional: set specific HIS protonation (CHARMM types: HSE, HSD, HSP).
+! PETase His-237 is typically neutral, epsilon-protonated (HSE).
+! Convert HIS237 -> HSE:
+define his237 sele segid PROA .and. resid 237 end
+if ?sel .gt. 0 then
+  rename residue HSE sele his237 end
+endif
+
+! build hydrogens and fill missing heavy atoms if any
+ic fill preserve
+ic param
+hbuild
+! quick energy to catch glaring problems
+mini sd nstep 50 nprint 10
+
+! write clean outputs
+write psf card unit 21
+write coor pdb  unit 20
+stop
