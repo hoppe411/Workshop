@@ -1,45 +1,69 @@
 * PETase (6EQE) protein-only build
-* reads PDB, keeps protein chain A, adds H, writes clean PSF/PDB
+* Reads PDB, keeps protein chain A, patches termini,
+* adds hydrogens, writes clean PSF/PDB
+*
 
+! ---- SETTINGS ----
 set TOPPAR = ~/petase_charmm/toppar
+set TERMINI = A   ! options: A (NTER/CTER), B (ACE+CTER), C (ACE+NME)
 
 ! ---- I/O ----
 open unit 10 read  form name 6EQE.pdb
 open unit 20 write form name petase_clean.pdb
 open unit 21 write form name petase_clean.psf
 
-! ---- force field ----
+! ---- Force field ----
 read rtf  card name @TOPPAR/top_all36_prot.rtf
 read para card name @TOPPAR/par_all36m_prot.prm
 stream @TOPPAR/toppar_water_ions.str   ! TIP3P + ions params (for later)
 
-! ---- use helper to read PDB cleanly ----
-stream @TOPPAR/pdbread.str
-
-! Read only the protein (chain A). pdbread.str ignores HETATM by default.
-! If needed, you can explicitly tell it which chain to take (segid/chain A).
-! Most 6EQE files have chain A only; if your file uses chain ID 'A', we mirror it:
+! ---- Read sequence from PDB ----
 read sequ pdb unit 10
-generate PROA setup first nter last cter
-rewind unit 10
-read coor  pdb unit 10 resid
 
-! Optional: set specific HIS protonation (CHARMM types: HSE, HSD, HSP).
-! PETase His-237 is typically neutral, epsilon-protonated (HSE).
-! Convert HIS237 -> HSE:
+! ---- Generate segment with chosen termini ----
+if @TERMINI eq A then
+   ! Case A: free zwitterionic termini (–NH3+ / –COO-)
+   generate PROA setup first nter last cter
+endif
+
+if @TERMINI eq B then
+   ! Case B: acetylated N-term, free C-term
+   generate PROA setup first none last none
+   patch ACE PROA 1
+   patch CTER PROA @last
+endif
+
+if @TERMINI eq C then
+   ! Case C: both ends neutral (ACE/NME)
+   generate PROA setup first none last none
+   patch ACE PROA 1
+   patch NME PROA @last
+endif
+
+rewind unit 10
+read coor pdb unit 10 resid
+
+! ---- Special protonation handling ----
+! PETase His-237 is neutral, epsilon-protonated (HSE)
 define his237 sele segid PROA .and. resid 237 end
 if ?sel .gt. 0 then
   rename residue HSE sele his237 end
 endif
 
-! build hydrogens and fill missing heavy atoms if any
+! ---- Build missing atoms / hydrogens ----
 ic fill preserve
 ic param
 hbuild
-! quick energy to catch glaring problems
-mini sd nstep 50 nprint 10
 
-! write clean outputs
+! ---- Quick minimization to catch bad geometry ----
+mini sd nstep 50 nprint 10
+mini abnr nstep 200 nprint 20
+
+! ---- Report charge for sanity check ----
+scalar charge show sele segid PROA end
+
+! ---- Write outputs ----
 write psf card unit 21
-write coor pdb  unit 20
+write coor pdb unit 20
+
 stop
