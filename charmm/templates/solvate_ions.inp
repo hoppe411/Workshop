@@ -1,0 +1,54 @@
+* Solvate PETase (6EQE) in TIP3P water + add ions
+*
+
+! ---- SETTINGS ----
+set TOPPAR = ~/projects/repo/charmm/toppar
+
+! Input from build stage
+open unit 10 read card name petase_clean.psf
+open unit 11 read card name petase_clean.pdb
+
+! Output solvated
+open unit 20 write card name petase_solv.psf
+open unit 21 write card name petase_solv.pdb
+
+! ---- Force field ----
+read rtf  card name @TOPPAR/top_all36_prot.rtf
+read para card name @TOPPAR/par_all36m_prot.prm
+stream @TOPPAR/toppar_water_ions.str
+
+! ---- Load system ----
+read psf  card unit 10
+read coor pdb  unit 11
+
+! ---- Define protein selection ----
+define prot sele segid PROA end
+
+! ---- Solvation ----
+! Place protein in cubic water box with 12 Å padding
+! You can adjust "12.0" if you want larger buffer
+solvate octa 12.0 sele prot end
+
+! ---- Ion placement ----
+! Add Na+ and Cl- ions until neutral, then to 0.15 M salt
+! (You can change conc if you like)
+autoionize sele prot end neutralize 0.15
+
+! ---- Quick minimization of waters/ions ----
+! (restrain protein heavy atoms so only solvent relaxes)
+cons harm force 50.0 sele prot .and. .not. hydrogen end
+
+mini sd nstep 200 nprint 20
+mini abnr nstep 500 nprint 50
+
+cons clear
+
+! ---- Save solvated system ----
+write psf card unit 20
+* PETase solvated + ions PSF
+*
+write coor pdb unit 21
+* PETase solvated + ions coordinates
+*
+
+stop
