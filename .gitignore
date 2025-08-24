@@ -1,0 +1,12 @@
+# never version giant outputs
+*.dcd
+*.trr
+*.xtc
+*.coor
+*.rst*
+*.log
+*.out
+*.chk
+slurm-*.out
+# per-run folders in scratch (created by scripts)
+runs/
