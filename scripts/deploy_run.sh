@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- config you might edit once ---
-REPO_DIR="${REPO_DIR:-$HOME/projects/repo}"
+REPO_DIR="${REPO_DIR:-$HOME/projects/Workshop}"
 SCRATCH_BASE="${SCRATCH_BASE:-/scratch/$USER/charmm}"
 RUNID="${RUNID:-$(date +%Y%m%d-%H%M%S)}"
 JOBNAME="${JOBNAME:-charmm-test}"
